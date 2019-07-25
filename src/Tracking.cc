@@ -113,7 +113,7 @@ Tracking::Tracking(System *pSys, ORBVocabulary* pVoc, FrameDrawer *pFrameDrawer,
 
     // Load ORB parameters
 
-    // step: 初始化 ORBextractor 参数，参数数量、金字塔、最低响应值
+    // step2: 初始化 ORBextractor 参数，参数数量、金字塔、最低响应值
     int nFeatures = fSettings["ORBextractor.nFeatures"];
     float fScaleFactor = fSettings["ORBextractor.scaleFactor"];
     int nLevels = fSettings["ORBextractor.nLevels"];

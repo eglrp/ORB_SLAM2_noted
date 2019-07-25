@@ -92,6 +92,8 @@ protected:
                                            const int &maxX, const int &minY, const int &maxY, const int &nFeatures, const int &level);
 
     void ComputeKeyPointsOld(std::vector<std::vector<cv::KeyPoint> >& allKeypoints);
+
+    // BRIEF 描述子中的像素对，共 256 对，即 256 维的描述子
     std::vector<cv::Point> pattern;
 
     int nfeatures;
@@ -100,8 +102,10 @@ protected:
     int iniThFAST;
     int minThFAST;
 
+    // 每层金字塔应该提取的关键点数，总和为 nFeatures
     std::vector<int> mnFeaturesPerLevel;
 
+    // 右上四分之一圆上的像素点，下标存 v，值存 u，用于计算朝向
     std::vector<int> umax;
 
     std::vector<float> mvScaleFactor;
