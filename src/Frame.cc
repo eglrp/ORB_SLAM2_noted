@@ -229,6 +229,7 @@ Frame::Frame(const cv::Mat &imGray, const double &timeStamp, ORBextractor* extra
 
 void Frame::AssignFeaturesToGrid()
 {
+    // 均分还除以 2，会算计
     int nReserve = 0.5f*N/(FRAME_GRID_COLS*FRAME_GRID_ROWS);
     for(unsigned int i=0; i<FRAME_GRID_COLS;i++)
         for (unsigned int j=0; j<FRAME_GRID_ROWS;j++)
@@ -401,6 +402,11 @@ void Frame::ComputeBoW()
     }
 }
 
+/**
+ * @brief 对关键点去畸变。
+ * 为什么不在检测的时候对图像去畸变呢
+ * 
+ */
 void Frame::UndistortKeyPoints()
 {
     if(mDistCoef.at<float>(0)==0.0)
@@ -433,6 +439,11 @@ void Frame::UndistortKeyPoints()
     }
 }
 
+/**
+ * @brief 计算去畸变后的图像边界
+ * 
+ * @param imLeft 
+ */
 void Frame::ComputeImageBounds(const cv::Mat &imLeft)
 {
     if(mDistCoef.at<float>(0)!=0.0)

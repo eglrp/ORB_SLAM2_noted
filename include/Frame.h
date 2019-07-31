@@ -34,6 +34,7 @@
 
 namespace ORB_SLAM2
 {
+// TODO: 作用：Keypoints are assigned to cells in a grid to reduce matching complexity when projecting MapPoints.
 #define FRAME_GRID_ROWS 48
 #define FRAME_GRID_COLS 64
 
