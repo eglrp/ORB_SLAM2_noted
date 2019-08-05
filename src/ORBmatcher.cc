@@ -35,7 +35,7 @@ namespace ORB_SLAM2
 {
 
 const int ORBmatcher::TH_HIGH = 100;
-const int ORBmatcher::TH_LOW = 50;
+const int ORBmatcher::TH_LOW = 50;  // 匹配成功需要的最低汉明距离
 const int ORBmatcher::HISTO_LENGTH = 30;
 
 ORBmatcher::ORBmatcher(float nnratio, bool checkOri): mfNNratio(nnratio), mbCheckOrientation(checkOri)
@@ -402,6 +402,16 @@ int ORBmatcher::SearchByProjection(KeyFrame* pKF, cv::Mat Scw, const vector<MapP
     return nmatches;
 }
 
+/**
+ * @brief 对 F1 每个 0 层的特征点，在对应的 F2 的 windowSize 内搜索特征点
+ * 
+ * @param F1 
+ * @param F2 
+ * @param vbPrevMatched 
+ * @param vnMatches12 
+ * @param windowSize 
+ * @return int 
+ */
 int ORBmatcher::SearchForInitialization(Frame &F1, Frame &F2, vector<cv::Point2f> &vbPrevMatched, vector<int> &vnMatches12, int windowSize)
 {
     int nmatches=0;
@@ -419,6 +429,7 @@ int ORBmatcher::SearchForInitialization(Frame &F1, Frame &F2, vector<cv::Point2f
     {
         cv::KeyPoint kp1 = F1.mvKeysUn[i1];
         int level1 = kp1.octave;
+        // 只处理第 0 层的特征点，为啥
         if(level1>0)
             continue;
 
@@ -431,7 +442,7 @@ int ORBmatcher::SearchForInitialization(Frame &F1, Frame &F2, vector<cv::Point2f
 
         int bestDist = INT_MAX;
         int bestDist2 = INT_MAX;
-        int bestIdx2 = -1;
+        int bestIdx2 = -1;  // 对应的是 bestDist
 
         for(vector<size_t>::iterator vit=vIndices2.begin(); vit!=vIndices2.end(); vit++)
         {
@@ -458,8 +469,10 @@ int ORBmatcher::SearchForInitialization(Frame &F1, Frame &F2, vector<cv::Point2f
 
         if(bestDist<=TH_LOW)
         {
+            // i1 附近需要有至少两个相似的特征点
             if(bestDist<(float)bestDist2*mfNNratio)
             {
+                // 并且还是未与其他 F1 特征点匹配的两个特征点
                 if(vnMatches21[bestIdx2]>=0)
                 {
                     vnMatches12[vnMatches21[bestIdx2]]=-1;
@@ -498,6 +511,7 @@ int ORBmatcher::SearchForInitialization(Frame &F1, Frame &F2, vector<cv::Point2f
         {
             if(i==ind1 || i==ind2 || i==ind3)
                 continue;
+            // 去除不在最大三个角度差 hist 的匹配
             for(size_t j=0, jend=rotHist[i].size(); j<jend; j++)
             {
                 int idx1 = rotHist[i][j];
@@ -512,6 +526,7 @@ int ORBmatcher::SearchForInitialization(Frame &F1, Frame &F2, vector<cv::Point2f
     }
 
     //Update prev matched
+    // 直接把匹配的点放在 vbPrevMatched，也太省了吧，原本是存 F1 中的特征点的。接下来就只能通过 vnMatches12 来判断 vbPrevMatched 里的点到底是 F1 的还是匹配后 F2 的了
     for(size_t i1=0, iend1=vnMatches12.size(); i1<iend1; i1++)
         if(vnMatches12[i1]>=0)
             vbPrevMatched[i1]=F2.mvKeysUn[vnMatches12[i1]].pt;
@@ -1598,6 +1613,15 @@ int ORBmatcher::SearchByProjection(Frame &CurrentFrame, KeyFrame *pKF, const set
     return nmatches;
 }
 
+/**
+ * @brief 选出三个最突出的 hist，同时 id2 不能比 id1 小太多，id3 不能比 id2 小太多
+ * 
+ * @param histo 
+ * @param L 
+ * @param ind1 
+ * @param ind2 
+ * @param ind3 
+ */
 void ORBmatcher::ComputeThreeMaxima(vector<int>* histo, const int L, int &ind1, int &ind2, int &ind3)
 {
     int max1=0;
@@ -1644,6 +1668,13 @@ void ORBmatcher::ComputeThreeMaxima(vector<int>* histo, const int L, int &ind1, 
 
 // Bit set count operation from
 // http://graphics.stanford.edu/~seander/bithacks.html#CountBitsSetParallel
+/**
+ * @brief 这么秀的吗，神奇的 bit 操作计算汉明距离
+ * 
+ * @param a 
+ * @param b 
+ * @return int 
+ */
 int ORBmatcher::DescriptorDistance(const cv::Mat &a, const cv::Mat &b)
 {
     const int *pa = a.ptr<int32_t>();

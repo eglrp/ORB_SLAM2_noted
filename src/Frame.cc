@@ -325,6 +325,17 @@ bool Frame::isInFrustum(MapPoint *pMP, float viewingCosLimit)
     return true;
 }
 
+/**
+ * @brief 取出在 (x, y) 处，以 r 为半径的正方形内的特征点，可能需要特征点的 level 满足 minLevel 和 maxLevel 的要求
+ * 利用四叉树加速查找，不然可能需要对方形的像素逐个比较或对所有特征点逐个比较距离是否满足 r
+ * 
+ * @param x 
+ * @param y 
+ * @param r 
+ * @param minLevel 
+ * @param maxLevel 
+ * @return vector<size_t> 
+ */
 vector<size_t> Frame::GetFeaturesInArea(const float &x, const float  &y, const float  &r, const int minLevel, const int maxLevel) const
 {
     vector<size_t> vIndices;

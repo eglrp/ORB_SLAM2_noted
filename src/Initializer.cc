@@ -41,6 +41,18 @@ Initializer::Initializer(const Frame &ReferenceFrame, float sigma, int iteration
     mMaxIterations = iterations;
 }
 
+/**
+ * @brief 根据参考帧 mvKeys1、当前帧 CurrentFrame 以及两帧匹配结果 vMatches12，初始化并三角化得到三维空间点
+ * 
+ * @param CurrentFrame 
+ * @param vMatches12 
+ * @param R21 
+ * @param t21 
+ * @param vP3D 
+ * @param vbTriangulated 
+ * @return true 
+ * @return false 
+ */
 bool Initializer::Initialize(const Frame &CurrentFrame, const vector<int> &vMatches12, cv::Mat &R21, cv::Mat &t21,
                              vector<cv::Point3f> &vP3D, vector<bool> &vbTriangulated)
 {
@@ -265,6 +277,13 @@ cv::Mat Initializer::ComputeH21(const vector<cv::Point2f> &vP1, const vector<cv:
     return vt.row(8).reshape(0, 3);
 }
 
+/**
+ * @brief SVD 分解 F，调整奇异值 sig3 = 0
+ * 
+ * @param vP1 
+ * @param vP2 
+ * @return cv::Mat 
+ */
 cv::Mat Initializer::ComputeF21(const vector<cv::Point2f> &vP1,const vector<cv::Point2f> &vP2)
 {
     const int N = vP1.size();
@@ -302,6 +321,16 @@ cv::Mat Initializer::ComputeF21(const vector<cv::Point2f> &vP1,const vector<cv::
     return  u*cv::Mat::diag(w)*vt;
 }
 
+/**
+ * @brief 根据计算出来的 H 分别计算 kp1 到 kp2 和 kp2 到 kp1 的重投影误差
+ * 将小于一定阈值的视为 inlier kp，并累加 score
+ * 
+ * @param H21 
+ * @param H12 
+ * @param vbMatchesInliers 两个重投影误差均小于阈值的关键点对置为 true
+ * @param sigma 
+ * @return float 返回 score，越高则重投影误差越低
+ */
 float Initializer::CheckHomography(const cv::Mat &H21, const cv::Mat &H12, vector<bool> &vbMatchesInliers, float sigma)
 {   
     const int N = mvMatches12.size();
@@ -387,6 +416,14 @@ float Initializer::CheckHomography(const cv::Mat &H21, const cv::Mat &H12, vecto
     return score;
 }
 
+/**
+ * @brief 极线重投影误差
+ * 
+ * @param F21 
+ * @param vbMatchesInliers 
+ * @param sigma 
+ * @return float 
+ */
 float Initializer::CheckFundamental(const cv::Mat &F21, vector<bool> &vbMatchesInliers, float sigma)
 {
     const int N = mvMatches12.size();
@@ -569,6 +606,21 @@ bool Initializer::ReconstructF(vector<bool> &vbMatchesInliers, cv::Mat &F21, cv:
     return false;
 }
 
+/**
+ * @brief H 恢复 R,t 推导可见 ORB_SLAM2源码详解.pdf，checkRt 进行筛选
+ * 
+ * @param vbMatchesInliers 
+ * @param H21 
+ * @param K 
+ * @param R21 
+ * @param t21 
+ * @param vP3D 
+ * @param vbTriangulated 
+ * @param minParallax 
+ * @param minTriangulated 
+ * @return true 
+ * @return false 
+ */
 bool Initializer::ReconstructH(vector<bool> &vbMatchesInliers, cv::Mat &H21, cv::Mat &K,
                       cv::Mat &R21, cv::Mat &t21, vector<cv::Point3f> &vP3D, vector<bool> &vbTriangulated, float minParallax, int minTriangulated)
 {
@@ -731,6 +783,15 @@ bool Initializer::ReconstructH(vector<bool> &vbMatchesInliers, cv::Mat &H21, cv:
     return false;
 }
 
+/**
+ * @brief 简单的三角化
+ * 
+ * @param kp1 
+ * @param kp2 
+ * @param P1 
+ * @param P2 
+ * @param x3D 
+ */
 void Initializer::Triangulate(const cv::KeyPoint &kp1, const cv::KeyPoint &kp2, const cv::Mat &P1, const cv::Mat &P2, cv::Mat &x3D)
 {
     cv::Mat A(4,4,CV_32F);
@@ -746,6 +807,13 @@ void Initializer::Triangulate(const cv::KeyPoint &kp1, const cv::KeyPoint &kp2, 
     x3D = x3D.rowRange(0,3)/x3D.at<float>(3);
 }
 
+/**
+ * @brief TODO: 这个归一化没看懂，可以看下 MVG 4.4.4 Normalizing transforms
+ * 
+ * @param vKeys 
+ * @param vNormalizedPoints 
+ * @param T 
+ */
 void Initializer::Normalize(const vector<cv::KeyPoint> &vKeys, vector<cv::Point2f> &vNormalizedPoints, cv::Mat &T)
 {
     float meanX = 0;
@@ -794,7 +862,22 @@ void Initializer::Normalize(const vector<cv::KeyPoint> &vKeys, vector<cv::Point2
     T.at<float>(1,2) = -meanY*sY;
 }
 
-
+/**
+ * @brief 检查 R,t，1. 两帧中的三维点深度都需要大于 0；2. 旋转需要足够小；3. 重投影误差需要足够小
+ * 
+ * @param R 
+ * @param t 
+ * @param vKeys1 
+ * @param vKeys2 
+ * @param vMatches12 
+ * @param vbMatchesInliers 
+ * @param K 
+ * @param vP3D 
+ * @param th2 
+ * @param vbGood 
+ * @param parallax 
+ * @return int nGood
+ */
 int Initializer::CheckRT(const cv::Mat &R, const cv::Mat &t, const vector<cv::KeyPoint> &vKeys1, const vector<cv::KeyPoint> &vKeys2,
                        const vector<Match> &vMatches12, vector<bool> &vbMatchesInliers,
                        const cv::Mat &K, vector<cv::Point3f> &vP3D, float th2, vector<bool> &vbGood, float &parallax)
@@ -863,6 +946,7 @@ int Initializer::CheckRT(const cv::Mat &R, const cv::Mat &t, const vector<cv::Ke
         if(p3dC2.at<float>(2)<=0 && cosParallax<0.99998)
             continue;
 
+        // 三角化之后的重投影误差
         // Check reprojection error in first image
         float im1x, im1y;
         float invZ1 = 1.0/p3dC1.at<float>(2);
@@ -906,6 +990,14 @@ int Initializer::CheckRT(const cv::Mat &R, const cv::Mat &t, const vector<cv::Ke
     return nGood;
 }
 
+/**
+ * @brief SVD 分解 E，其中有对 t 进行归一化
+ * 
+ * @param E 
+ * @param R1 
+ * @param R2 
+ * @param t 
+ */
 void Initializer::DecomposeE(const cv::Mat &E, cv::Mat &R1, cv::Mat &R2, cv::Mat &t)
 {
     cv::Mat u,w,vt;

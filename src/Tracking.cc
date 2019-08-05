@@ -595,6 +595,7 @@ void Tracking::MonocularInitialization()
     else
     {
         // Try to initialize
+        // 关键点不足直接重新设置参考帧
         if((int)mCurrentFrame.mvKeys.size()<=100)
         {
             delete mpInitializer;
@@ -608,6 +609,7 @@ void Tracking::MonocularInitialization()
         int nmatches = matcher.SearchForInitialization(mInitialFrame,mCurrentFrame,mvbPrevMatched,mvIniMatches,100);
 
         // Check if there are enough correspondences
+        // 匹配数不够也重新设置参考帧
         if(nmatches<100)
         {
             delete mpInitializer;
@@ -619,6 +621,8 @@ void Tracking::MonocularInitialization()
         cv::Mat tcw; // Current Camera Translation
         vector<bool> vbTriangulated; // Triangulated Correspondences (mvIniMatches)
 
+        // 若初始化不成功，则继续使用 mvbPrevMatched 尝试进行匹配、初始化
+        // TODO: 为什么这里初始化失败还可以接着使用 mvbPrevMatched 呢
         if(mpInitializer->Initialize(mCurrentFrame, mvIniMatches, Rcw, tcw, mvIniP3D, vbTriangulated))
         {
             for(size_t i=0, iend=mvIniMatches.size(); i<iend;i++)
