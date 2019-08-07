@@ -189,7 +189,7 @@ public:
     const cv::Mat mK;
 
 
-    // The following variables need to be accessed trough a mutex to be thread safe.
+    // The following variables need to be accessed through a mutex to be thread safe.
 protected:
 
     // SE3 Pose and camera center

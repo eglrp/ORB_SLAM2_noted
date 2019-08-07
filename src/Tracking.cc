@@ -646,6 +646,10 @@ void Tracking::MonocularInitialization()
     }
 }
 
+/**
+ * @brief 初始化地图点、initFrame 作为关键帧插入
+ * 
+ */
 void Tracking::CreateInitialMapMonocular()
 {
     // Create KeyFrames
@@ -661,6 +665,7 @@ void Tracking::CreateInitialMapMonocular()
     mpMap->AddKeyFrame(pKFcur);
 
     // Create MapPoints and asscoiate to keyframes
+    // MapPoint 保存 3D 位置、平均观测方向、representative descriptor、最远和最近可观测距离（ORB 的尺度不变形）
     for(size_t i=0; i<mvIniMatches.size();i++)
     {
         if(mvIniMatches[i]<0)

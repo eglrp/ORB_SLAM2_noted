@@ -120,6 +120,12 @@ cv::Mat KeyFrame::GetTranslation()
     return Tcw.rowRange(0,3).col(3).clone();
 }
 
+/**
+ * @brief 一般需要 weight 大于 15 才会添加 connection
+ * 
+ * @param pKF 
+ * @param weight 
+ */
 void KeyFrame::AddConnection(KeyFrame *pKF, const int &weight)
 {
     {
@@ -135,6 +141,10 @@ void KeyFrame::AddConnection(KeyFrame *pKF, const int &weight)
     UpdateBestCovisibles();
 }
 
+/**
+ * @brief 更新当前关键帧的 mvpOrderedConnectedKeyFrames, mvOrderedWeights，就是做个降序排列
+ * 
+ */
 void KeyFrame::UpdateBestCovisibles()
 {
     unique_lock<mutex> lock(mMutexConnections);
@@ -143,6 +153,7 @@ void KeyFrame::UpdateBestCovisibles()
     for(map<KeyFrame*,int>::iterator mit=mConnectedKeyFrameWeights.begin(), mend=mConnectedKeyFrameWeights.end(); mit!=mend; mit++)
        vPairs.push_back(make_pair(mit->second,mit->first));
 
+    // 逆序排用 vector push_back 也挺好的呀
     sort(vPairs.begin(),vPairs.end());
     list<KeyFrame*> lKFs;
     list<int> lWs;
@@ -286,6 +297,13 @@ MapPoint* KeyFrame::GetMapPoint(const size_t &idx)
     return mvpMapPoints[idx];
 }
 
+/**
+ * @brief 更新当前 keyframe 以及 covisible 的 keyframe 的 connections
+ * 1. 统计观测到相同地图点的 keyframe 的权重（covisible points 的数量）
+ * 2. 更新当前 keyframe 以及 covisible 的 keyframe 的 mvpOrderedConnectedKeyFrames（降序排列）
+ * 3. 若为新增到 covisible graph 中的 keyframe，则选取 covisible points 最多的 keyframe 作为 parent
+ * 
+ */
 void KeyFrame::UpdateConnections()
 {
     map<KeyFrame*,int> KFcounter;
@@ -341,6 +359,7 @@ void KeyFrame::UpdateConnections()
         if(mit->second>=th)
         {
             vPairs.push_back(make_pair(mit->second,mit->first));
+            // mit->first --> this 的边
             (mit->first)->AddConnection(this,mit->second);
         }
     }
@@ -370,6 +389,7 @@ void KeyFrame::UpdateConnections()
 
         if(mbFirstConnection && mnId!=0)
         {
+            // 选取 covisible 最多的 keyframe 作为 parent
             mpParent = mvpOrderedConnectedKeyFrames.front();
             mpParent->AddChild(this);
             mbFirstConnection = false;
