@@ -314,10 +314,12 @@ void Tracking::Track()
 
                 if(mVelocity.empty() || mCurrentFrame.mnId<mnLastRelocFrameId+2)
                 {
+                    // 初始时刻或重定位之后，尝试根据 reference keyframe 跟踪
                     bOK = TrackReferenceKeyFrame();
                 }
                 else
                 {
+                    // 尝试根据运动模型跟踪
                     bOK = TrackWithMotionModel();
                     if(!bOK)
                         bOK = TrackReferenceKeyFrame();
@@ -753,6 +755,10 @@ void Tracking::CreateInitialMapMonocular()
     mState=OK;
 }
 
+/**
+ * @brief loop closure 之后 MapPoint 才有可能被 replaced
+ * 
+ */
 void Tracking::CheckReplacedInLastFrame()
 {
     for(int i =0; i<mLastFrame.N; i++)
@@ -770,7 +776,12 @@ void Tracking::CheckReplacedInLastFrame()
     }
 }
 
-
+/**
+ * @brief 根据 reference kf 的 map points 进行 PnP 位姿优化
+ * 
+ * @return true inlier map points 个数大于等于 10
+ * @return false 
+ */
 bool Tracking::TrackReferenceKeyFrame()
 {
     // Compute Bag of Words vector
@@ -781,6 +792,7 @@ bool Tracking::TrackReferenceKeyFrame()
     ORBmatcher matcher(0.7,true);
     vector<MapPoint*> vpMapPointMatches;
 
+    // TODO: 
     int nmatches = matcher.SearchByBoW(mpReferenceKF,mCurrentFrame,vpMapPointMatches);
 
     if(nmatches<15)
@@ -1244,7 +1256,11 @@ void Tracking::UpdateLocalPoints()
     }
 }
 
-
+/**
+ * @brief 选取与当前帧共视地图点的关键帧以及这些关键帧的相邻关键帧作为局部地图的关键帧
+ * 以共视地图点最多的关键帧作为 参考帧
+ * 
+ */
 void Tracking::UpdateLocalKeyFrames()
 {
     // Each map point vote for the keyframes in which it has been observed
@@ -1277,6 +1293,7 @@ void Tracking::UpdateLocalKeyFrames()
     mvpLocalKeyFrames.reserve(3*keyframeCounter.size());
 
     // All keyframes that observe a map point are included in the local map. Also check which keyframe shares most points
+    // 添加与当前帧共视 map point 的关键帧，并找出共视最多 map points 的关键帧
     for(map<KeyFrame*,int>::const_iterator it=keyframeCounter.begin(), itEnd=keyframeCounter.end(); it!=itEnd; it++)
     {
         KeyFrame* pKF = it->first;
@@ -1296,6 +1313,7 @@ void Tracking::UpdateLocalKeyFrames()
 
 
     // Include also some not-already-included keyframes that are neighbors to already-included keyframes
+    // 添加一些与共视帧相邻的关键帧
     for(vector<KeyFrame*>::const_iterator itKF=mvpLocalKeyFrames.begin(), itEndKF=mvpLocalKeyFrames.end(); itKF!=itEndKF; itKF++)
     {
         // Limit the number of keyframes
@@ -1306,6 +1324,7 @@ void Tracking::UpdateLocalKeyFrames()
 
         const vector<KeyFrame*> vNeighs = pKF->GetBestCovisibilityKeyFrames(10);
 
+        // neighbor 关键帧
         for(vector<KeyFrame*>::const_iterator itNeighKF=vNeighs.begin(), itEndNeighKF=vNeighs.end(); itNeighKF!=itEndNeighKF; itNeighKF++)
         {
             KeyFrame* pNeighKF = *itNeighKF;
@@ -1320,6 +1339,7 @@ void Tracking::UpdateLocalKeyFrames()
             }
         }
 
+        // 子关键帧
         const set<KeyFrame*> spChilds = pKF->GetChilds();
         for(set<KeyFrame*>::const_iterator sit=spChilds.begin(), send=spChilds.end(); sit!=send; sit++)
         {
@@ -1335,6 +1355,7 @@ void Tracking::UpdateLocalKeyFrames()
             }
         }
 
+        // parent 关键帧
         KeyFrame* pParent = pKF->GetParent();
         if(pParent)
         {
@@ -1342,6 +1363,7 @@ void Tracking::UpdateLocalKeyFrames()
             {
                 mvpLocalKeyFrames.push_back(pParent);
                 pParent->mnTrackReferenceForFrame=mCurrentFrame.mnId;
+                // TODO: 为什么这里也 break
                 break;
             }
         }
@@ -1350,6 +1372,7 @@ void Tracking::UpdateLocalKeyFrames()
 
     if(pKFmax)
     {
+        // 选取共视 map points 最多的关键帧作为当前的 参考帧
         mpReferenceKF = pKFmax;
         mCurrentFrame.mpReferenceKF = mpReferenceKF;
     }
