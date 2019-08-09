@@ -1516,6 +1516,16 @@ int ORBmatcher::SearchByProjection(Frame &CurrentFrame, const Frame &LastFrame, 
     return nmatches;
 }
 
+/**
+ * @brief 用于重定位时搜索 map points
+ * 
+ * @param CurrentFrame 
+ * @param pKF 
+ * @param sAlreadyFound 
+ * @param th 
+ * @param ORBdist 
+ * @return int 
+ */
 int ORBmatcher::SearchByProjection(Frame &CurrentFrame, KeyFrame *pKF, const set<MapPoint*> &sAlreadyFound, const float th , const int ORBdist)
 {
     int nmatches = 0;

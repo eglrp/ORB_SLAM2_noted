@@ -1597,6 +1597,10 @@ bool Tracking::Relocalization()
 
 }
 
+/**
+ * @brief 初始化失败或者建图不久就丢失则 reset，重新初始化
+ * 
+ */
 void Tracking::Reset()
 {
 
