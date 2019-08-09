@@ -271,6 +271,10 @@ cv::Mat Tracking::GrabImageMonocular(const cv::Mat &im, const double &timestamp)
     return mCurrentFrame.mTcw.clone();
 }
 
+/**
+ * @brief 相机跟踪
+ * 
+ */
 void Tracking::Track()
 {
     if(mState==NO_IMAGES_YET)
@@ -436,6 +440,7 @@ void Tracking::Track()
                 cv::Mat LastTwc = cv::Mat::eye(4,4,CV_32F);
                 mLastFrame.GetRotationInverse().copyTo(LastTwc.rowRange(0,3).colRange(0,3));
                 mLastFrame.GetCameraCenter().copyTo(LastTwc.rowRange(0,3).col(3));
+                // mVelocity 保存其实就是 Tc --> lastTc
                 mVelocity = mCurrentFrame.mTcw*LastTwc;
             }
             else
@@ -444,6 +449,7 @@ void Tracking::Track()
             mpMapDrawer->SetCurrentCameraPose(mCurrentFrame.mTcw);
 
             // Clean VO matches
+            // 清除 UpdateLastFrame 中为了跟踪增加的 map point
             for(int i=0; i<mCurrentFrame.N; i++)
             {
                 MapPoint* pMP = mCurrentFrame.mvpMapPoints[i];
@@ -827,6 +833,10 @@ bool Tracking::TrackReferenceKeyFrame()
     return nmatchesMap>=10;
 }
 
+/**
+ * @brief 双目或 rgbd 根据深度生成一些新的 map points
+ * 
+ */
 void Tracking::UpdateLastFrame()
 {
     // Update pose according to reference keyframe
@@ -893,6 +903,12 @@ void Tracking::UpdateLastFrame()
     }
 }
 
+/**
+ * @brief 根据匀速运动模型预测位姿，根据上一帧的 map points 进行 PnP 位姿优化
+ * 
+ * @return true 
+ * @return false 
+ */
 bool Tracking::TrackWithMotionModel()
 {
     ORBmatcher matcher(0.9,true);
@@ -956,6 +972,14 @@ bool Tracking::TrackWithMotionModel()
     return nmatchesMap>=10;
 }
 
+/**
+ * @brief 根据当前关键帧特征点匹配的地图点数量判断是否跟踪成功
+ * 1. 更新局部地图（关键帧，地图点）UpdateLocalMap
+ * 2. 为当前关键帧关联地图点 SearchLocalPoints
+ * 
+ * @return true 
+ * @return false 
+ */
 bool Tracking::TrackLocalMap()
 {
     // We have an estimation of the camera pose and some map points tracked in the frame.
@@ -993,6 +1017,7 @@ bool Tracking::TrackLocalMap()
 
     // Decide if the tracking was succesful
     // More restrictive if there was a relocalization recently
+    // 重定位之后需要匹配更多的 map point 才认为是跟踪成功
     if(mCurrentFrame.mnId<mnLastRelocFrameId+mMaxFrames && mnMatchesInliers<50)
         return false;
 
@@ -1002,7 +1027,12 @@ bool Tracking::TrackLocalMap()
         return true;
 }
 
-
+/**
+ * @brief 检查是否可以添加 keyframe
+ * 
+ * @return true 
+ * @return false 
+ */
 bool Tracking::NeedNewKeyFrame()
 {
     if(mbOnlyTracking)
@@ -1089,6 +1119,10 @@ bool Tracking::NeedNewKeyFrame()
         return false;
 }
 
+/**
+ * @brief 插入新的 keyframe
+ * 
+ */
 void Tracking::CreateNewKeyFrame()
 {
     if(!mpLocalMapper->SetNotStop(true))
@@ -1169,6 +1203,12 @@ void Tracking::CreateNewKeyFrame()
     mpLastKeyFrame = pKF;
 }
 
+/**
+ * @brief 为 current frame 中的关键点关联局部地图点
+ * 1. 选取投影在 current frame 视锥中的局部地图点
+ * 2. 对每个选取的局部地图点，寻找该地图点投影在 current frame 中附近最匹配的特征点，该特征点也就关联到了一个局部地图点
+ * 
+ */
 void Tracking::SearchLocalPoints()
 {
     // Do not search map points already matched
@@ -1215,12 +1255,17 @@ void Tracking::SearchLocalPoints()
         if(mSensor==System::RGBD)
             th=3;
         // If the camera has been relocalised recently, perform a coarser search
+        // 也就是增加搜索范围
         if(mCurrentFrame.mnId<mnLastRelocFrameId+2)
             th=5;
         matcher.SearchByProjection(mCurrentFrame,mvpLocalMapPoints,th);
     }
 }
 
+/**
+ * @brief 更新局部地图关键帧和地图点
+ * 
+ */
 void Tracking::UpdateLocalMap()
 {
     // This is for visualization
@@ -1231,6 +1276,10 @@ void Tracking::UpdateLocalMap()
     UpdateLocalPoints();
 }
 
+/**
+ * @brief 将 mvpLocalKeyFrames 中 keyframe 观测到的 map points 加入到局部 map points 中
+ * 
+ */
 void Tracking::UpdateLocalPoints()
 {
     mvpLocalMapPoints.clear();
@@ -1245,6 +1294,7 @@ void Tracking::UpdateLocalPoints()
             MapPoint* pMP = *itMP;
             if(!pMP)
                 continue;
+            // 当时差点搞混了，pKF 和 pMP 都有 mnTrackReferenceForFrame
             if(pMP->mnTrackReferenceForFrame==mCurrentFrame.mnId)
                 continue;
             if(!pMP->isBad())
@@ -1378,6 +1428,12 @@ void Tracking::UpdateLocalKeyFrames()
     }
 }
 
+/**
+ * @brief 上个相机位姿跟踪失败，重定位
+ * 
+ * @return true 
+ * @return false 
+ */
 bool Tracking::Relocalization()
 {
     // Compute Bag of Words Vector

@@ -267,6 +267,18 @@ void Frame::UpdatePoseMatrices()
     mOw = -mRcw.t()*mtcw;
 }
 
+/**
+ * @brief 检查 map point 是否在 frame 的视锥中
+ * 条件：1. 深度 z 大于 0
+ * 2. 能投影在图像 u，v 中
+ * 3. 能观测到的尺度
+ * 4. map point 的平均观测向量与当前观测向量夹角小于给定 viewingCosLimit
+ * 
+ * @param pMP 
+ * @param viewingCosLimit 
+ * @return true 
+ * @return false 
+ */
 bool Frame::isInFrustum(MapPoint *pMP, float viewingCosLimit)
 {
     pMP->mbTrackInView = false;

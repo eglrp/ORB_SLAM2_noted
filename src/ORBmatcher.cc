@@ -42,6 +42,16 @@ ORBmatcher::ORBmatcher(float nnratio, bool checkOri): mfNNratio(nnratio), mbChec
 {
 }
 
+/**
+ * @brief 对每个 map points，在 F 中找对应匹配的特征点
+ * 1. 先将 map point 投影到 F 中，在该投影附近找所有特征点，忽略已匹配 map point 的关键点
+ * 2. 根据描述子选择最相似的特征点作为该 map point 匹配的特征点
+ * 
+ * @param F 
+ * @param vpMapPoints 
+ * @param th 
+ * @return int 
+ */
 int ORBmatcher::SearchByProjection(Frame &F, const vector<MapPoint*> &vpMapPoints, const float th)
 {
     int nmatches=0;
@@ -84,6 +94,7 @@ int ORBmatcher::SearchByProjection(Frame &F, const vector<MapPoint*> &vpMapPoint
         {
             const size_t idx = *vit;
 
+            // 忽略已匹配 map point 的特征点
             if(F.mvpMapPoints[idx])
                 if(F.mvpMapPoints[idx]->Observations()>0)
                     continue;
@@ -117,6 +128,7 @@ int ORBmatcher::SearchByProjection(Frame &F, const vector<MapPoint*> &vpMapPoint
         // Apply ratio to second match (only if best and second are in the same scale level)
         if(bestDist<=TH_HIGH)
         {
+            // TODO: 注释说要在同一个 level，但这里的条件是同个 level 忽略啊，难道不是条件错了吗？
             if(bestLevel==bestLevel2 && bestDist>mfNNratio*bestDist2)
                 continue;
 
@@ -128,6 +140,13 @@ int ORBmatcher::SearchByProjection(Frame &F, const vector<MapPoint*> &vpMapPoint
     return nmatches;
 }
 
+/**
+ * @brief 根据当前帧观测到 map point 的向量与平均观测向量的夹角确定图像中的搜索范围
+ * 夹角小与 3.6 度则返回 2.5，否则返回 4.0
+ * 
+ * @param viewCos 
+ * @return float 
+ */
 float ORBmatcher::RadiusByViewingCos(const float &viewCos)
 {
     if(viewCos>0.998)
@@ -1340,6 +1359,19 @@ int ORBmatcher::SearchBySim3(KeyFrame *pKF1, KeyFrame *pKF2, vector<MapPoint*> &
     return nFound;
 }
 
+/**
+ * @brief 通过投影，对上一帧的特征点进行跟踪（自己没看，直接看的别人的注释）
+ *
+ * 上一帧中包含了MapPoints，对这些MapPoints进行tracking，由此增加当前帧的MapPoints \n
+ * 1. 将上一帧的MapPoints投影到当前帧(根据速度模型可以估计当前帧的Tcw)
+ * 2. 在投影点附近根据描述子距离选取匹配，以及最终的方向投票机制进行剔除
+ * @param  CurrentFrame 当前帧
+ * @param  LastFrame    上一帧
+ * @param  th           阈值
+ * @param  bMono        是否为单目
+ * @return              成功匹配的数量
+ * @see SearchByBoW()
+ */
 int ORBmatcher::SearchByProjection(Frame &CurrentFrame, const Frame &LastFrame, const float th, const bool bMono)
 {
     int nmatches = 0;
