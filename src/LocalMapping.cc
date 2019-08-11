@@ -125,6 +125,14 @@ bool LocalMapping::CheckNewKeyFrames()
     return(!mlNewKeyFrames.empty());
 }
 
+/**
+ * @brief 处理新插入的 keyframe
+ * 1. 计算 BoW
+ * 2. 更新 keyframe 关联的 map points 的 observations
+ * 3. 更新 keyframe 的 covis graph
+ * 4. 插入 map
+ * 
+ */
 void LocalMapping::ProcessNewKeyFrame()
 {
     {
@@ -167,6 +175,12 @@ void LocalMapping::ProcessNewKeyFrame()
     mpMap->AddKeyFrame(mpCurrentKeyFrame);
 }
 
+/**
+ * @brief 根据 VI.B 条件对最近添加的 map points 进行 culling，保证 map points 的质量
+ * 1. 观测比例高于 25%
+ * 2. 创建 map point 后的连续两帧 keyframe 都要观测到
+ * 
+ */
 void LocalMapping::MapPointCulling()
 {
     // Check Recent Added MapPoints
@@ -204,6 +218,10 @@ void LocalMapping::MapPointCulling()
     }
 }
 
+/**
+ * @brief 根据对极约束搜索匹配点，根据三角化创建新的 map points
+ * 
+ */
 void LocalMapping::CreateNewMapPoints()
 {
     // Retrieve neighbor keyframes in covisibility graph
@@ -229,6 +247,7 @@ void LocalMapping::CreateNewMapPoints()
     const float &invfx1 = mpCurrentKeyFrame->invfx;
     const float &invfy1 = mpCurrentKeyFrame->invfy;
 
+    // 1.8
     const float ratioFactor = 1.5f*mpCurrentKeyFrame->mfScaleFactor;
 
     int nnew=0;
@@ -246,6 +265,7 @@ void LocalMapping::CreateNewMapPoints()
         cv::Mat vBaseline = Ow2-Ow1;
         const float baseline = cv::norm(vBaseline);
 
+        // 基线距离太短不做处理（极线约束的问题）
         if(!mbMonocular)
         {
             if(baseline<pKF2->mb)
@@ -300,6 +320,7 @@ void LocalMapping::CreateNewMapPoints()
             cv::Mat xn1 = (cv::Mat_<float>(3,1) << (kp1.pt.x-cx1)*invfx1, (kp1.pt.y-cy1)*invfy1, 1.0);
             cv::Mat xn2 = (cv::Mat_<float>(3,1) << (kp2.pt.x-cx2)*invfx2, (kp2.pt.y-cy2)*invfy2, 1.0);
 
+            // TODO: 不应该减去 Rcw1 才是得到光心到地图点的射线么？
             cv::Mat ray1 = Rwc1*xn1;
             cv::Mat ray2 = Rwc2*xn2;
             const float cosParallaxRays = ray1.dot(ray2)/(cv::norm(ray1)*cv::norm(ray2));
@@ -451,6 +472,11 @@ void LocalMapping::CreateNewMapPoints()
     }
 }
 
+/**
+ * @brief 1. 遍历一级二级相邻帧，使用 current frame 的 map points 进行融合替换
+ * 2. 添加一级二级相邻帧的 map points，与 current frame 的 map points 进行融合替换
+ * 
+ */
 void LocalMapping::SearchInNeighbors()
 {
     // Retrieve neighbor keyframes
@@ -478,9 +504,11 @@ void LocalMapping::SearchInNeighbors()
         }
     }
 
-
     // Search matches by projection from current KF in target KFs
     ORBmatcher matcher;
+    // 对于一级二级相邻帧，用 current frame 的 map point 检查是否有对应匹配的特征点
+    // 1.a. 如果有且特征点有对应的 map point，将观测更少的 map point 替换掉
+    // 1.b. 如果有且特征点没有对应的 map point，直接添加 observation
     vector<MapPoint*> vpMapPointMatches = mpCurrentKeyFrame->GetMapPointMatches();
     for(vector<KeyFrame*>::iterator vit=vpTargetKFs.begin(), vend=vpTargetKFs.end(); vit!=vend; vit++)
     {
@@ -493,6 +521,9 @@ void LocalMapping::SearchInNeighbors()
     vector<MapPoint*> vpFuseCandidates;
     vpFuseCandidates.reserve(vpTargetKFs.size()*vpMapPointMatches.size());
 
+    // 对一级二级相邻帧的所有 map point，检查 current frame 是否有对应匹配点
+    // 1.a. 如果有且特征点有对应的 map point，将观测更少的 map point 替换掉
+    // 1.b. 如果有且特征点没有对应的 map point，直接添加 observation
     for(vector<KeyFrame*>::iterator vitKF=vpTargetKFs.begin(), vendKF=vpTargetKFs.end(); vitKF!=vendKF; vitKF++)
     {
         KeyFrame* pKFi = *vitKF;
@@ -513,8 +544,10 @@ void LocalMapping::SearchInNeighbors()
 
     matcher.Fuse(mpCurrentKeyFrame,vpFuseCandidates);
 
-
     // Update points
+    // 因为所有的 map point 只跟 current frame 相关，所有直接更新 current frame 的 map point 即可
+    // 原因：1. 如果第一次融合 current frame 中的 map point 被替换，会被删除为 nullptr，不用更新
+    // 2. 如果第一次融合没有被替换，则会被更新
     vpMapPointMatches = mpCurrentKeyFrame->GetMapPointMatches();
     for(size_t i=0, iend=vpMapPointMatches.size(); i<iend; i++)
     {
@@ -629,6 +662,10 @@ void LocalMapping::InterruptBA()
     mbAbortBA = true;
 }
 
+/**
+ * @brief 删除冗余 keyframe，下面注释解释的很清楚
+ * 
+ */
 void LocalMapping::KeyFrameCulling()
 {
     // Check redundant keyframes (only local keyframes)

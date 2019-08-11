@@ -688,6 +688,16 @@ int ORBmatcher::SearchByBoW(KeyFrame *pKF1, KeyFrame *pKF2, vector<MapPoint *> &
     return nmatches;
 }
 
+/**
+ * @brief TODO: 之后再看
+ * 
+ * @param pKF1 
+ * @param pKF2 
+ * @param F12 
+ * @param vMatchedPairs 
+ * @param bOnlyStereo 
+ * @return int 
+ */
 int ORBmatcher::SearchForTriangulation(KeyFrame *pKF1, KeyFrame *pKF2, cv::Mat F12,
                                        vector<pair<size_t, size_t> > &vMatchedPairs, const bool bOnlyStereo)
 {    
